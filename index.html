@@ -6,6 +6,8 @@
     <link rel="stylesheet" href="/lib/codemirror.css" />
     <script src="/lib/javascript.js"></script>
 
+    <script src="/lib/smssage.js"></script>
+
     <style>
 body {
   background-color: black;
@@ -63,61 +65,11 @@ body {
 </div>
     <script>
 
-Triggerable = function () {
-    // half-baked signals
-    this._signals = {};         // name of signal -> list of listeners
-};
-
-Triggerable.prototype.bind = function (signal, cb) {
-    if (this._signals[signal] === undefined) {
-        this._signals[signal] = [cb];
-    }
-    else {
-        this._signals[signal].push(cb);
-    }
-};
-
-Triggerable.prototype.trigger = function (signal, ev) {
-    if (this._signals[signal] !== undefined) {
-        this._signals[signal].forEach(function (cb) {
-            cb(ev);
-        });
-    }
-};
-
-var UpdatingDictionary = function(map) {
-    Triggerable.call(this);
-    this.map = map || {};
-}
-UpdatingDictionary.prototype = new Triggerable;
-UpdatingDictionary.prototype.set = function(k,v) {
-    var change = false;
-    if(k in this.map)
-        change = true;
-
-    this.map[k] = v;
-    if(change)
-        this.trigger("update", [k,v]);
-    else
-        this.trigger("add", [k,v]);
-    this.trigger("change", [k,v]);
-};
-UpdatingDictionary.prototype.rename = function(k1,k2) {
-    this.map[k2] = this.map[k1];
-    this.map[k1] = undefined;
-    delete this.map[k1];
-    this.trigger("rename", [k1,k2]);
-};
-UpdatingDictionary.prototype.remove = function(k1) {
-    delete this.map[k1];
-    this.trigger("delete", [k1]);
-};
-
 var MessageLog = function() {
-    Triggerable.call(this);
+    SMS.Triggerable.call(this);
     this.$el = document.createElement('div');
 };
-MessageLog.prototype = new Triggerable();
+MessageLog.prototype = new SMS.Triggerable();
 MessageLog.prototype.render = function(messages, handlers) {
     var acc = "";
     for(var k in messages.map) {
@@ -128,7 +80,7 @@ MessageLog.prototype.render = function(messages, handlers) {
 };
 
 var Tabs = function() {
-    Triggerable.call(this);
+    SMS.Triggerable.call(this);
     this.$el = document.createElement('div');
     this.$el.classList.add("tabs");
 
@@ -149,7 +101,7 @@ var Tabs = function() {
 
     this.tabs = {};
 };
-Tabs.prototype = new Triggerable;
+Tabs.prototype = new SMS.Triggerable;
 Tabs.prototype.add = function(k) {
     var key = k;
 
@@ -199,7 +151,7 @@ Tabs.prototype.select = function(k) {
     this.trigger("selected", k);
 };
 var Editor = function() {
-    Triggerable.call(this);
+    SMS.Triggerable.call(this);
     this.$el = document.createElement('div');
     (function(that) {
         that.editor = CodeMirror(that.$el, {
@@ -212,13 +164,13 @@ var Editor = function() {
         });
     })(this)
 }
-Editor.prototype = new Triggerable;
+Editor.prototype = new SMS.Triggerable;
 Editor.prototype.set = function(v) {
     this.editor.setValue(v);
 }
 
-var messages = new UpdatingDictionary();
-var handlers = new UpdatingDictionary();
+var messages = new SMS.UpdatingDictionary();
+var handlers = new SMS.UpdatingDictionary();
 
 var tabs = new Tabs();
 var messagelog = new MessageLog();
