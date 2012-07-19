@@ -57,6 +57,10 @@ body {
 .tab.selected div {
   display: none;
 }
+.response {
+  color: #ff0000;
+  margin-left: 20px;
+}
     </style>
   </head>
   <body>
@@ -77,7 +81,7 @@ MessageLog.prototype.render = function(messages, handlers) {
     var acc = "";
     for(var k in messages.map) {
         acc += k + "<br>";
-        acc += messages.map[k] + "<p>"
+        acc += messages.map[k] + "<span class='response'>" + handlers.getResponse(k, messages.map[k]) + "</span><p>";
     }
     this.$el.innerHTML = acc;
 };
@@ -95,6 +99,7 @@ var Tabs = function() {
     (function(that){
         that.$new.onclick = function() {
             that.trigger("new");
+            that.select('untitled');
         }
     })(this)
 
@@ -196,15 +201,20 @@ handlers.bind("rename", function(x) { tabs.rename(x[0], x[1]); });
 handlers.bind("validity", function(kv) { tabs.setValidity(kv[0], kv[1]); })
 
 
-tabs.bind("rename", function(x) { handlers.rename(x[0], x[1]); });
+tabs.bind("rename", function(x) { 
+socket.emit("rename", x);
+handlers.rename(x[0], x[1]); });
 
 tabs.bind("new", function() { handlers.set("untitled", "function(k,v){\n  return '';\n}") });
 tabs.bind("selected", function(k) { editor.set(handlers.map[k]); });
 
 editor.bind("change", function(x) { 
     // XXX: not so often!
-    socket.emit("code", [tabs.selected, x]);
     handlers.set(tabs.selected, x);
+    if(tabs.selected !== "untitled") {
+        messagelog.render(messages, handlers);
+        socket.emit("code", [tabs.selected, x]);
+    }
 });
 
 messages.bind("change", function(x) { messagelog.render(messages, handlers); });

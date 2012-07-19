@@ -3,9 +3,10 @@ var app = require('http').createServer(handler)
   , fs = require('fs')
   , qs = require('querystring')
   , url = require('url')
+  , sms = require('./lib/smssage.js')
   , SOCKETS = []                // all open sockets
-  , MESSAGES = {}               // phone number -> last message
-  , CODE = {};                  // substring -> function (as string)
+  , messages = new sms.UpdatingDictionary()
+  , handlers = new sms.Handlers();
 
 app.listen(5858);
 
@@ -38,11 +39,17 @@ function handler (req, res) {
             var data = qs.parse(req.content);
             console.log("sms received", data);
 
-            MESSAGES[data.from] = data.message;
+            messages.set(data.from, data.message);
             relayMessageToClients(data.from, data.message);
 
             res.end(JSON.stringify({payload: {
                 success: true,
+                secret: data.secret,
+                task: "send",
+                messages: [
+                    {to: data.from,
+                     message: handlers.getResponse(data.from, data.message)}
+                ]
             }}));
         });
 
@@ -76,8 +83,8 @@ function handler (req, res) {
 io.sockets.on('connection', function(socket) {
     SOCKETS.push(socket);
 
-    socket.emit('messages', MESSAGES);
-    socket.emit('codes', CODE);
+    socket.emit('messages', messages.map);
+    socket.emit('codes', handlers.map);
 
     socket.on('disconnect', function() {
         for(var i=0; i<SOCKETS.length; i++) {
@@ -88,8 +95,12 @@ io.sockets.on('connection', function(socket) {
         }
     });
 
+    socket.on('rename', function(kv) {
+        handlers.rename(kv[0], kv[1]);
+    });
+
     socket.on('code', function(data) {
-        CODE[data[0]] = data[1];
+        handlers.set(data[0], data[1]);
         relayCodeToClients(socket, data[0], data[1]);
     });
 
