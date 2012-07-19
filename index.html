@@ -224,23 +224,27 @@ var tabs = new Tabs();
 var messagelog = new MessageLog();
 var editor = new Editor();
 
+var socket = io.connect('http://localhost:5858')
+  , MESSAGES = {}
+  , CODE = {};
+
 handlers.bind("add", function(x) { tabs.add(x[0]); });
 handlers.bind("rename", function(x) { tabs.rename(x[0], x[1]); });
 tabs.bind("rename", function(x) { handlers.rename(x[0], x[1]); });
-//handlers.bind("update", function(x) { editor.update(x[0], x[1]); });
 
 tabs.bind("new", function() { handlers.set("untitled", "function(k,v){\n  return '';\n}") });
 tabs.bind("selected", function(k) { editor.set(handlers.map[k]); });
 
-editor.bind("change", function(x) { handlers.set(tabs.selected, x); });
+editor.bind("change", function(x) { 
+    // XXX: not so often!
+    socket.emit("code", [tabs.selected, x]);
+    handlers.set(tabs.selected, x);
+});
 
 messages.bind("change", function(x) { messagelog.render(messages, handlers); });
 //messages.bind("update", function(x) { editors.update(x[0], x[1]); });
 
 
-var socket = io.connect('http://localhost:5858')
-  , MESSAGES = {}
-  , CODE = {};
 
 function newCode() {
     var $el = document.createElement('div');

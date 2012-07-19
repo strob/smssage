@@ -14,9 +14,10 @@ function relayMessageToClients (from, msg) {
         s.emit('message', [from, msg]);
     });
 };
-function relayCodeToClients (k,v) {
-    SOCKETS.forEach(function(s) {
-        s.emit('code', [k,v]);
+function relayCodeToClients (s,k,v) {
+    SOCKETS.forEach(function(socket) {
+        if(socket !== s)
+            socket.emit('code', [k,v]);
     });
 };
 
@@ -89,7 +90,7 @@ io.sockets.on('connection', function(socket) {
 
     socket.on('code', function(data) {
         CODE[data[0]] = data[1];
-        relayCodeToClients(data[0], data[1]);
+        relayCodeToClients(socket, data[0], data[1]);
     });
 
 });
