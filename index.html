@@ -2,15 +2,233 @@
   <head>
     <title>smssage</title>
     <script src="/socket.io/socket.io.js"></script>
+    <script src="/lib/codemirror.js"></script>
+    <link rel="stylesheet" href="/lib/codemirror.css" />
+    <script src="/lib/javascript.js"></script>
+
+    <style>
+body {
+  background-color: black;
+  color: #00ff00;
+  font-family: mono;
+  margin: 0;
+}
+#messages {
+  height: 200px;
+  overflow: auto;
+}
+#code {
+  background-color: white;
+  clear: both;
+}
+.tab {
+  float: left;
+  padding: 10px;
+  height: 20px;
+  background-color: yellow;
+  color: black;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-right: 1px solid black;
+}
+.tab.new {
+  background-color: #00ff00;
+}
+.tab:hover {
+  background-color: red;
+}
+.tab.selected {
+  background-color: magenta;
+}
+.tab input {
+  display: none;
+}
+.tab div {
+  display: block;
+}
+.tab.selected input {
+  display: block;
+}
+.tab.selected div {
+  display: none;
+}
+    </style>
   </head>
   <body>
 <div id="messages">
-waiting for messages from server ...
 </div>
-<div id="code">
-loading code ...
+<div id="codeeditor">
+  <div id="code">
+  </div>
 </div>
     <script>
+
+Triggerable = function () {
+    // half-baked signals
+    this._signals = {};         // name of signal -> list of listeners
+};
+
+Triggerable.prototype.bind = function (signal, cb) {
+    if (this._signals[signal] === undefined) {
+        this._signals[signal] = [cb];
+    }
+    else {
+        this._signals[signal].push(cb);
+    }
+};
+
+Triggerable.prototype.trigger = function (signal, ev) {
+    if (this._signals[signal] !== undefined) {
+        this._signals[signal].forEach(function (cb) {
+            cb(ev);
+        });
+    }
+};
+
+var UpdatingDictionary = function(map) {
+    Triggerable.call(this);
+    this.map = map || {};
+}
+UpdatingDictionary.prototype = new Triggerable;
+UpdatingDictionary.prototype.set = function(k,v) {
+    var change = false;
+    if(k in this.map)
+        change = true;
+
+    this.map[k] = v;
+    if(change)
+        this.trigger("update", [k,v]);
+    else
+        this.trigger("add", [k,v]);
+    this.trigger("change", [k,v]);
+};
+UpdatingDictionary.prototype.rename = function(k1,k2) {
+    this.map[k2] = this.map[k1];
+    this.map[k1] = undefined;
+    delete this.map[k1];
+    this.trigger("rename", [k1,k2]);
+};
+UpdatingDictionary.prototype.remove = function(k1) {
+    delete this.map[k1];
+    this.trigger("delete", [k1]);
+};
+
+var MessageLog = function() {
+    Triggerable.call(this);
+    this.$el = document.createElement('div');
+};
+MessageLog.prototype = new Triggerable();
+MessageLog.prototype.render = function(messages, handlers) {
+    var acc = "";
+    for(var k in messages.map) {
+        acc += k + "<br>";
+        acc += messages.map[k] + "<p>"
+    }
+    this.$el.innerHTML = acc;
+};
+
+var Tabs = function() {
+    Triggerable.call(this);
+    this.$el = document.createElement('div');
+    this.$el.classList.add("tabs");
+
+    this.$new = document.createElement('div');
+    this.$new.classList.add("tab");
+    this.$new.classList.add("new");
+    this.$new.innerHTML = "+";
+
+    (function(that){
+        that.$new.onclick = function() {
+            that.trigger("new");
+        }
+    })(this)
+
+    this.$el.appendChild(this.$new);
+
+    this.selected = null;
+
+    this.tabs = {};
+};
+Tabs.prototype = new Triggerable;
+Tabs.prototype.add = function(k) {
+    var key = k;
+
+    var $div = document.createElement('div');
+    $div.classList.add('tab');
+
+    var $ed = document.createElement('input');
+    var $txt = document.createElement('div');
+
+    $txt.innerHTML = key;
+    $ed.setAttribute('value', key);
+
+    $div.appendChild($ed);
+    $div.appendChild($txt);
+
+    (function(that) {
+        $div.onclick = function() {
+            that.select(key);
+        };
+
+        $ed.onchange = function() {
+            var newkey = $ed.value;
+            that.trigger("rename", [key, newkey]);
+            key = newkey;
+        };
+    })(this)
+
+    this.$el.insertBefore($div, this.$new)
+    this.tabs[k] = $div;
+};
+Tabs.prototype.rename = function(k1,k2) {
+    this.tabs[k2] = this.tabs[k1];
+    this.tabs[k1] = undefined;
+    delete this.tabs[k1];
+    var $div = this.tabs[k2];
+    $div.children[1].innerHTML = k2;
+
+    if(this.selected == k1)
+        this.selected = k2;
+};
+Tabs.prototype.select = function(k) {
+    if(this.selected) {
+        this.tabs[this.selected].classList.remove('selected');
+    }
+    this.selected = k;
+    this.tabs[k].classList.add('selected');
+    this.trigger("selected", k);
+};
+var Editor = function() {
+    this.$el = document.createElement('div');
+    this.editor = CodeMirror(this.$el, {
+        mode: "javascript",
+        tabMode: "indent",
+        onChange: function() {
+            console.log('c');
+        },
+        value: 'function() {}' 
+    });
+}
+Editor.prototype.set = function() {
+}
+
+var messages = new UpdatingDictionary();
+var handlers = new UpdatingDictionary();
+
+var tabs = new Tabs();
+var messagelog = new MessageLog();
+var editor = new Editor();
+
+handlers.bind("add", function(x) { tabs.add(x[0]); });
+handlers.bind("rename", function(x) { tabs.rename(x[0], x[1]); });
+tabs.bind("rename", function(x) { handlers.rename(x[0], x[1]); });
+//handlers.bind("update", function(x) { editor.update(x[0], x[1]); });
+
+tabs.bind("new", function() { handlers.set("untitled", "function(k,v){\n  return '';\n}") });
+
+messages.bind("change", function(x) { messagelog.render(messages, handlers); });
+//messages.bind("update", function(x) { editors.update(x[0], x[1]); });
+
 
 var socket = io.connect('http://localhost:5858')
   , MESSAGES = {}
@@ -39,34 +257,35 @@ function newCode() {
     return $el;
 }
 
-function drawMessages() {
-    var $mess = document.getElementById('messages');
-    $mess.innerHTML = JSON.stringify(MESSAGES);
-}
-function drawCode() {
-    var $code = document.getElementById('code');
-    $code.innerHTML = JSON.stringify(CODE);
-}
-
 socket.on('messages', function(data) {
     console.log('received');
-    MESSAGES = data;
-    drawMessages();
+    for(k in data) {
+        messages.set(k, data[k]);
+    }
 });
 socket.on('message', function(data) {
-    MESSAGES[data[0]] = data[1];
-    drawMessages();
+    console.log('onmessage', data);
+    messages.set(data[0], data[1]);
 });
 socket.on('codes', function(data) {
-    CODE = data;
-    drawCode();
+    for(k in data) {
+        handlers.set(k, data[k]);
+    }
 });
 socket.on('code', function(data) {
-    CODE[data[0]] = data[1];
-    drawCode();
+    handlers.set(data[0], data[1]);
 });
 
-document.body.appendChild(newCode());
+var $ce = document.getElementById('codeeditor');
+$ce.insertBefore(tabs.$el, document.getElementById('code'));
+
+var $ml = document.getElementById('messages');
+$ml.appendChild(messagelog.$el);
+
+var $ed = document.getElementById('code');
+$ed.appendChild(editor.$el);
+
+//document.body.appendChild(newCode());
 
     </script>
   </body>

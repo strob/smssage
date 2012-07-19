@@ -1,6 +1,7 @@
 var app = require('http').createServer(handler)
   , io = require('socket.io').listen(app)
   , fs = require('fs')
+  , qs = require('querystring')
   , url = require('url')
   , SOCKETS = []                // all open sockets
   , MESSAGES = {}               // phone number -> last message
@@ -37,13 +38,24 @@ function handler (req, res) {
             console.log("sms received", data);
 
             MESSAGES[data.from] = data.message;
-            flush();
+            relayMessageToClients(data.from, data.message);
 
             res.end(JSON.stringify({payload: {
                 success: true,
             }}));
         });
 
+    }
+
+    else if(path.indexOf('lib') == 1) {
+        fs.readFile(__dirname + path, function (err, data) {
+            if (err) {
+                res.writeHead(500);
+                return res.end('Error loading '+path);
+            }
+            res.writeHead(200);
+            res.end(data);
+        });
     }
 
     else {
