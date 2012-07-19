@@ -199,17 +199,22 @@ Tabs.prototype.select = function(k) {
     this.trigger("selected", k);
 };
 var Editor = function() {
+    Triggerable.call(this);
     this.$el = document.createElement('div');
-    this.editor = CodeMirror(this.$el, {
-        mode: "javascript",
-        tabMode: "indent",
-        onChange: function() {
-            console.log('c');
-        },
-        value: 'function() {}' 
-    });
+    (function(that) {
+        that.editor = CodeMirror(that.$el, {
+            mode: "javascript",
+            tabMode: "indent",
+            onChange: function() {
+                that.trigger("change", that.editor.getValue());
+            },
+            value: 'function() {}' 
+        });
+    })(this)
 }
-Editor.prototype.set = function() {
+Editor.prototype = new Triggerable;
+Editor.prototype.set = function(v) {
+    this.editor.setValue(v);
 }
 
 var messages = new UpdatingDictionary();
@@ -225,6 +230,9 @@ tabs.bind("rename", function(x) { handlers.rename(x[0], x[1]); });
 //handlers.bind("update", function(x) { editor.update(x[0], x[1]); });
 
 tabs.bind("new", function() { handlers.set("untitled", "function(k,v){\n  return '';\n}") });
+tabs.bind("selected", function(k) { editor.set(handlers.map[k]); });
+
+editor.bind("change", function(x) { handlers.set(tabs.selected, x); });
 
 messages.bind("change", function(x) { messagelog.render(messages, handlers); });
 //messages.bind("update", function(x) { editors.update(x[0], x[1]); });
