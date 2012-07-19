@@ -33,11 +33,14 @@ body {
   cursor: pointer;
   border-right: 1px solid black;
 }
+.tab.invalid {
+  background-color: #ff0000;
+}
 .tab.new {
   background-color: #00ff00;
 }
 .tab:hover {
-  background-color: red;
+  background-color: white;
 }
 .tab.selected {
   background-color: magenta;
@@ -150,6 +153,14 @@ Tabs.prototype.select = function(k) {
     this.tabs[k].classList.add('selected');
     this.trigger("selected", k);
 };
+Tabs.prototype.setValidity = function(k,valid) {
+    if(!valid) {
+        this.tabs[k].classList.add('invalid');
+    }
+    else {
+        this.tabs[k].classList.remove('invalid');
+    }
+};
 var Editor = function() {
     SMS.Triggerable.call(this);
     this.$el = document.createElement('div');
@@ -170,7 +181,7 @@ Editor.prototype.set = function(v) {
 }
 
 var messages = new SMS.UpdatingDictionary();
-var handlers = new SMS.UpdatingDictionary();
+var handlers = new SMS.Handlers();
 
 var tabs = new Tabs();
 var messagelog = new MessageLog();
@@ -182,6 +193,9 @@ var socket = io.connect('http://localhost:5858')
 
 handlers.bind("add", function(x) { tabs.add(x[0]); });
 handlers.bind("rename", function(x) { tabs.rename(x[0], x[1]); });
+handlers.bind("validity", function(kv) { tabs.setValidity(kv[0], kv[1]); })
+
+
 tabs.bind("rename", function(x) { handlers.rename(x[0], x[1]); });
 
 tabs.bind("new", function() { handlers.set("untitled", "function(k,v){\n  return '';\n}") });
