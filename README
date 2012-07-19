@@ -1,3 +1,6 @@
 collaborative sms autoresponder
 
-gateway
+% node smssage.node.js
+
+will create a gateway (eg. for SMSSync Android App)
+and a webservice to determine its responses to text messages.
