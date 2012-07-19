@@ -1,0 +1,73 @@
+<html>
+  <head>
+    <title>smssage</title>
+    <script src="/socket.io/socket.io.js"></script>
+  </head>
+  <body>
+<div id="messages">
+waiting for messages from server ...
+</div>
+<div id="code">
+loading code ...
+</div>
+    <script>
+
+var socket = io.connect('http://localhost:5858')
+  , MESSAGES = {}
+  , CODE = {};
+
+function newCode() {
+    var $el = document.createElement('div');
+
+    var $short = document.createElement('input');
+    var $txt = document.createElement('textarea');
+    var $sub = document.createElement('input');
+    $sub.setAttribute('type', 'submit');
+
+    $sub.onclick = function() {
+        var short = $short.value;
+        var txt = $txt.value;
+        console.log(short, txt);
+
+        socket.emit('code', [short, txt]);
+    }
+
+    $el.appendChild($short);
+    $el.appendChild($txt);
+    $el.appendChild($sub);
+
+    return $el;
+}
+
+function drawMessages() {
+    var $mess = document.getElementById('messages');
+    $mess.innerHTML = JSON.stringify(MESSAGES);
+}
+function drawCode() {
+    var $code = document.getElementById('code');
+    $code.innerHTML = JSON.stringify(CODE);
+}
+
+socket.on('messages', function(data) {
+    console.log('received');
+    MESSAGES = data;
+    drawMessages();
+});
+socket.on('message', function(data) {
+    MESSAGES[data[0]] = data[1];
+    drawMessages();
+});
+socket.on('codes', function(data) {
+    CODE = data;
+    drawCode();
+});
+socket.on('code', function(data) {
+    CODE[data[0]] = data[1];
+    drawCode();
+});
+
+document.body.appendChild(newCode());
+
+    </script>
+  </body>
+</html>
