@@ -153,6 +153,7 @@ Tabs.prototype.rename = function(k1,k2) {
 Tabs.prototype.select = function(k) {
     if(this.selected) {
         this.tabs[this.selected].classList.remove('selected');
+        this.trigger("deselected", this.selected);
     }
     this.selected = k;
     this.tabs[k].classList.add('selected');
@@ -184,6 +185,9 @@ Editor.prototype = new SMS.Triggerable;
 Editor.prototype.set = function(v) {
     this.editor.setValue(v);
 }
+Editor.prototype.get = function() {
+    return this.editor.getValue();
+}
 
 var messages = new SMS.UpdatingDictionary();
 var handlers = new SMS.Handlers();
@@ -207,14 +211,19 @@ handlers.rename(x[0], x[1]); });
 
 tabs.bind("new", function() { handlers.set("untitled", "function(k,v){\n  return '';\n}") });
 tabs.bind("selected", function(k) { editor.set(handlers.map[k]); });
+tabs.bind("deselected", function(k) {
+    console.log(k, 'deselected');
+    if(k !== "untitled") {
+        handlers.validate(k);
+        messagelog.render(messages, handlers);
+        console.log('code', editor.get());
+        socket.emit("code", [k, editor.get()]);
+    }
+});
 
 editor.bind("change", function(x) { 
     // XXX: not so often!
     handlers.set(tabs.selected, x);
-    if(tabs.selected !== "untitled") {
-        messagelog.render(messages, handlers);
-        socket.emit("code", [tabs.selected, x]);
-    }
 });
 
 messages.bind("change", function(x) { messagelog.render(messages, handlers); });
