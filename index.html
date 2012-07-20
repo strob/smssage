@@ -61,6 +61,14 @@ body {
   color: #ff0000;
   margin-left: 20px;
 }
+.testmessage {
+  width: 200px;
+  position: absolute;
+  top: 0;
+  right: 0;
+  background-color: orange;
+  padding: 10px;
+}
     </style>
   </head>
   <body>
@@ -85,6 +93,28 @@ MessageLog.prototype.render = function(messages, handlers) {
     }
     this.$el.innerHTML = acc;
 };
+
+var TestMessage = function() {
+    SMS.Triggerable.call(this);
+    this.$el = document.createElement('div');
+    this.$el.classList.add('testmessage');
+
+    var $num = document.createElement('input');
+    var $txt = document.createElement('textarea');
+    var $sub = document.createElement('input');
+    $sub.setAttribute('type', 'submit');
+
+    this.$el.appendChild($num);
+    this.$el.appendChild($txt);
+    this.$el.appendChild($sub);
+
+    (function(that) {
+        $sub.onclick = function() {
+            that.trigger('text', [$num.value, $txt.value]);
+        }
+    })(this);
+};
+TestMessage.prototype = new SMS.Triggerable;
 
 var Tabs = function() {
     SMS.Triggerable.call(this);
@@ -195,6 +225,7 @@ var handlers = new SMS.Handlers();
 var tabs = new Tabs();
 var messagelog = new MessageLog();
 var editor = new Editor();
+var testmsg = new TestMessage();
 
 var socket = io.connect('http://localhost:5858')
   , MESSAGES = {}
@@ -203,7 +234,6 @@ var socket = io.connect('http://localhost:5858')
 handlers.bind("add", function(x) { tabs.add(x[0]); });
 handlers.bind("rename", function(x) { tabs.rename(x[0], x[1]); });
 handlers.bind("validity", function(kv) { tabs.setValidity(kv[0], kv[1]); })
-
 
 tabs.bind("rename", function(x) { 
 socket.emit("rename", x);
@@ -222,37 +252,15 @@ tabs.bind("deselected", function(k) {
 });
 
 editor.bind("change", function(x) { 
-    // XXX: not so often!
     handlers.set(tabs.selected, x);
+});
+
+testmsg.bind("text", function(kv) {
+    messages.set(kv[0], kv[1]);
 });
 
 messages.bind("change", function(x) { messagelog.render(messages, handlers); });
 //messages.bind("update", function(x) { editors.update(x[0], x[1]); });
-
-
-
-function newCode() {
-    var $el = document.createElement('div');
-
-    var $short = document.createElement('input');
-    var $txt = document.createElement('textarea');
-    var $sub = document.createElement('input');
-    $sub.setAttribute('type', 'submit');
-
-    $sub.onclick = function() {
-        var short = $short.value;
-        var txt = $txt.value;
-        console.log(short, txt);
-
-        socket.emit('code', [short, txt]);
-    }
-
-    $el.appendChild($short);
-    $el.appendChild($txt);
-    $el.appendChild($sub);
-
-    return $el;
-}
 
 socket.on('messages', function(data) {
     console.log('received');
@@ -278,6 +286,8 @@ $ce.insertBefore(tabs.$el, document.getElementById('code'));
 
 var $ml = document.getElementById('messages');
 $ml.appendChild(messagelog.$el);
+
+$ml.appendChild(testmsg.$el);
 
 var $ed = document.getElementById('code');
 $ed.appendChild(editor.$el);
