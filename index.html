@@ -240,7 +240,7 @@ tabs.bind("rename", function(x) {
 socket.emit("rename", x);
 handlers.rename(x[0], x[1]); });
 
-tabs.bind("new", function() { handlers.set("untitled", "function(k,v){\n  return '';\n}") });
+tabs.bind("new", function() { handlers.set("untitled", "function(from, message){\n  return 'unimplemented';\n}") });
 tabs.bind("selected", function(k) { editor.set(handlers.map[k]); });
 tabs.bind("deselected", function(k) {
     console.log(k, 'deselected');
