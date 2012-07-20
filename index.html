@@ -245,7 +245,7 @@ tabs.bind("deselected", function(k) {
     if(k !== "untitled") {
         var oldcode = handlers.map[k];
         var newcode = editor.get();
-        handlers.set(tabs.selected, x);
+        handlers.set(tabs.selected, newcode);
         if(oldcode !== newcode && handlers.validate(k)) {
             messagelog.render(messages, handlers);
             console.log('saving code', k, editor.get());
@@ -277,6 +277,7 @@ socket.on('message', function(data) {
     messages.set(data[0], data[1]);
 });
 socket.on('codes', function(data) {
+    console.log('codereceived', data);
     for(k in data) {
         handlers.set(k, data[k]);
         handlers.validate(k);
