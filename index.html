@@ -243,7 +243,10 @@ tabs.bind("new", function() { handlers.set("untitled", "function(from, message){
 tabs.bind("selected", function(k) { editor.set(handlers.map[k]); });
 tabs.bind("deselected", function(k) {
     if(k !== "untitled") {
-        if(handlers.validate(k)) {
+        var oldcode = handlers.map[k];
+        var newcode = editor.get();
+        handlers.set(tabs.selected, x);
+        if(oldcode !== newcode && handlers.validate(k)) {
             messagelog.render(messages, handlers);
             console.log('saving code', k, editor.get());
             socket.emit("code", [k, editor.get()]);
@@ -252,7 +255,7 @@ tabs.bind("deselected", function(k) {
 });
 
 editor.bind("change", function(x) { 
-    handlers.set(tabs.selected, x);
+
 });
 
 testmsg.bind("text", function(kv) {
@@ -267,6 +270,7 @@ socket.on('messages', function(data) {
     for(k in data) {
         messages.set(k, data[k]);
     }
+    messagelog.render(messages, handlers);
 });
 socket.on('message', function(data) {
     console.log('onmessage', data);
@@ -277,6 +281,7 @@ socket.on('codes', function(data) {
         handlers.set(k, data[k]);
         handlers.validate(k);
     }
+    messagelog.render(messages, handlers);
 });
 socket.on('code', function(data) {
     handlers.set(data[0], data[1]);
