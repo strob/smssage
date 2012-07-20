@@ -207,8 +207,7 @@ var Editor = function() {
             tabMode: "indent",
             onChange: function() {
                 that.trigger("change", that.editor.getValue());
-            },
-            value: 'function() {}' 
+            }
         });
     })(this)
 }
@@ -243,12 +242,12 @@ handlers.rename(x[0], x[1]); });
 tabs.bind("new", function() { handlers.set("untitled", "function(from, message){\n  return 'unimplemented';\n}") });
 tabs.bind("selected", function(k) { editor.set(handlers.map[k]); });
 tabs.bind("deselected", function(k) {
-    console.log(k, 'deselected');
     if(k !== "untitled") {
-        handlers.validate(k);
-        messagelog.render(messages, handlers);
-        console.log('code', editor.get());
-        socket.emit("code", [k, editor.get()]);
+        if(handlers.validate(k)) {
+            messagelog.render(messages, handlers);
+            console.log('saving code', k, editor.get());
+            socket.emit("code", [k, editor.get()]);
+        }
     }
 });
 
@@ -293,6 +292,9 @@ $ml.appendChild(testmsg.$el);
 
 var $ed = document.getElementById('code');
 $ed.appendChild(editor.$el);
+
+tabs.trigger("new");
+tabs.select('untitled');
 
 //document.body.appendChild(newCode());
 
