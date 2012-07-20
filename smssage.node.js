@@ -21,6 +21,13 @@ function relayCodeToClients (s,k,v) {
             socket.emit('code', [k,v]);
     });
 };
+function relayRenameToClients (s,k,v) {
+    // XXX repeated code
+    SOCKETS.forEach(function(socket) {
+        if(socket !== s)
+            socket.emit('rename', [k,v]);
+    });
+};
 
 function handler (req, res) {
     var reqUrl = url.parse(req.url, true);
@@ -96,7 +103,8 @@ io.sockets.on('connection', function(socket) {
     });
 
     socket.on('rename', function(kv) {
-        handlers.rename(kv[0], kv[1]);
+        handlers.rename(socket, kv[0], kv[1]);
+        relayRenameToClients(socket, kv[0], kv[1]);
     });
 
     socket.on('code', function(data) {

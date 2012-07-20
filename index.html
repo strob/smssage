@@ -281,6 +281,9 @@ socket.on('codes', function(data) {
 socket.on('code', function(data) {
     handlers.set(data[0], data[1]);
 });
+socket.on('rename', function(data) {
+    handlers.rename(data[0], data[1]);
+});
 
 var $ce = document.getElementById('codeeditor');
 $ce.insertBefore(tabs.$el, document.getElementById('code'));
