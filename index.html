@@ -172,16 +172,24 @@ Tabs.prototype.add = function(k) {
     this.tabs[k] = $div;
 };
 Tabs.prototype.rename = function(k1,k2) {
-    this.tabs[k2] = this.tabs[k1];
-    this.tabs[k1] = undefined;
-    delete this.tabs[k1];
-    var $div = this.tabs[k2];
-    $div.children[1].innerHTML = k2;
+    if(!this.tabs[k1]) {
+        // eg. renaming an untitled file
+        this.add(k2);
+    }
+    else {
+        this.tabs[k2] = this.tabs[k1];
+        this.tabs[k1] = undefined;
+        delete this.tabs[k1];
+        var $div = this.tabs[k2];
+        $div.children[1].innerHTML = k2;
 
-    if(this.selected == k1)
-        this.selected = k2;
+        if(this.selected == k1)
+            this.selected = k2;
+    }
 };
 Tabs.prototype.select = function(k) {
+    if(this.selected == k)
+        return
     if(this.selected) {
         this.tabs[this.selected].classList.remove('selected');
         this.trigger("deselected", this.selected);
@@ -236,26 +244,24 @@ handlers.bind("rename", function(x) { tabs.rename(x[0], x[1]); });
 handlers.bind("validity", function(kv) { tabs.setValidity(kv[0], kv[1]); })
 
 tabs.bind("rename", function(x) { 
-socket.emit("rename", x);
-handlers.rename(x[0], x[1]); });
+    if(x[0] != 'untitled')
+        socket.emit("rename", x);
+    handlers.rename(x[0], x[1]); 
+});
 
 tabs.bind("new", function() { handlers.set("untitled", "function(from, message){\n  return 'unimplemented';\n}") });
 tabs.bind("selected", function(k) { editor.set(handlers.map[k]); });
 tabs.bind("deselected", function(k) {
+    var oldcode = handlers.map[k];
+    var newcode = editor.get();
+    handlers.set(tabs.selected, newcode);
     if(k !== "untitled") {
-        var oldcode = handlers.map[k];
-        var newcode = editor.get();
-        handlers.set(tabs.selected, newcode);
         if(oldcode !== newcode && handlers.validate(k)) {
             messagelog.render(messages, handlers);
             console.log('saving code', k, editor.get());
             socket.emit("code", [k, editor.get()]);
         }
     }
-});
-
-editor.bind("change", function(x) { 
-
 });
 
 testmsg.bind("text", function(kv) {
@@ -266,7 +272,7 @@ messages.bind("change", function(x) { messagelog.render(messages, handlers); });
 //messages.bind("update", function(x) { editors.update(x[0], x[1]); });
 
 socket.on('messages', function(data) {
-    console.log('received');
+    console.log('onmessages');
     for(k in data) {
         messages.set(k, data[k]);
     }
@@ -285,9 +291,11 @@ socket.on('codes', function(data) {
     messagelog.render(messages, handlers);
 });
 socket.on('code', function(data) {
+    console.log('oncode', data);
     handlers.set(data[0], data[1]);
 });
 socket.on('rename', function(data) {
+    console.log('onrename', data);
     handlers.rename(data[0], data[1]);
 });
 
