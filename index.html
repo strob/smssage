@@ -276,6 +276,7 @@ socket.on('message', function(data) {
 socket.on('codes', function(data) {
     for(k in data) {
         handlers.set(k, data[k]);
+        handlers.validate(k);
     }
 });
 socket.on('code', function(data) {
