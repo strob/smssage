@@ -109,6 +109,7 @@ io.sockets.on('connection', function(socket) {
 
     socket.on('code', function(data) {
         handlers.set(data[0], data[1]);
+        handlers.validate(data[0]);
         relayCodeToClients(socket, data[0], data[1]);
     });
 
