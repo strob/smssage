@@ -4,3 +4,19 @@ collaborative sms autoresponder
 
 will create a gateway (eg. for SMSSync Android App)
 and a webservice to determine its responses to text messages.
+
+
+a new smssage app is initialized with two tabs:
+1. setup(ctx): called on startup
+2. dispatch(ctx,msg): called on new messages
+
+
+the context object is passed to each dispatch call,
+so that data might perist and be communicable.
+
+
+messages are evaluated on the server, as well as each client.  any
+string returned by the server is sent back to sms sender.
+
+a flag, `ctx.is_server,` is available so that client-side code can be
+isolated from server code.

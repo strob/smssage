@@ -33,9 +33,6 @@ body {
   cursor: pointer;
   border-right: 1px solid black;
 }
-.tab.invalid {
-  background-color: #ff0000;
-}
 .tab.new {
   background-color: #00ff00;
 }
@@ -83,15 +80,13 @@ body {
 var MessageLog = function() {
     SMS.Triggerable.call(this);
     this.$el = document.createElement('div');
+    this.acc = "";
 };
 MessageLog.prototype = new SMS.Triggerable();
-MessageLog.prototype.render = function(messages, handlers) {
-    var acc = "";
-    for(var k in messages.map) {
-        acc += k + "<br>";
-        acc += messages.map[k] + "<span class='response'>" + handlers.getResponse(k, messages.map[k]) + "</span><p>";
-    }
-    this.$el.innerHTML = acc;
+MessageLog.prototype.add = function(from, msg, rsp) {
+    this.acc += from + "<br>";
+    this.acc += msg + "<span class='response'>" + rsp + "</span><p>";
+    this.$el.innerHTML = this.acc;
 };
 
 var TestMessage = function() {
@@ -198,14 +193,7 @@ Tabs.prototype.select = function(k) {
     this.tabs[k].classList.add('selected');
     this.trigger("selected", k);
 };
-Tabs.prototype.setValidity = function(k,valid) {
-    if(!valid) {
-        this.tabs[k].classList.add('invalid');
-    }
-    else {
-        this.tabs[k].classList.remove('invalid');
-    }
-};
+
 var Editor = function() {
     SMS.Triggerable.call(this);
     this.$el = document.createElement('div');
@@ -234,14 +222,12 @@ var tabs = new Tabs();
 var messagelog = new MessageLog();
 var editor = new Editor();
 var testmsg = new TestMessage();
+var context = {handlers: handlers};
 
-var socket = io.connect('http://localhost:5858')
-  , MESSAGES = {}
-  , CODE = {};
+var socket = io.connect('http://localhost:5858');
 
 handlers.bind("add", function(x) { tabs.add(x[0]); });
 handlers.bind("rename", function(x) { tabs.rename(x[0], x[1]); });
-handlers.bind("validity", function(kv) { tabs.setValidity(kv[0], kv[1]); })
 
 tabs.bind("rename", function(x) { 
     if(x[0] != 'untitled')
@@ -249,15 +235,14 @@ tabs.bind("rename", function(x) {
     handlers.rename(x[0], x[1]); 
 });
 
-tabs.bind("new", function() { handlers.set("untitled", "function(from, message){\n  return 'unimplemented';\n}") });
+tabs.bind("new", function() { handlers.set("untitled", "function(ctx, msg){\n  return 'unimplemented';\n}") });
 tabs.bind("selected", function(k) { editor.set(handlers.map[k]); });
 tabs.bind("deselected", function(k) {
     var oldcode = handlers.map[k];
     var newcode = editor.get();
     handlers.set(tabs.selected, newcode);
     if(k !== "untitled") {
-        if(oldcode !== newcode && handlers.validate(k)) {
-            messagelog.render(messages, handlers);
+        if(oldcode !== newcode) {
             console.log('saving code', k, editor.get());
             socket.emit("code", [k, editor.get()]);
         }
@@ -268,15 +253,19 @@ testmsg.bind("text", function(kv) {
     messages.set(kv[0], kv[1]);
 });
 
-messages.bind("change", function(x) { messagelog.render(messages, handlers); });
-//messages.bind("update", function(x) { editors.update(x[0], x[1]); });
+messages.bind("change", function(kv) { 
+    messagelog.add(kv[0], kv[1], handlers.getResponse(
+        context, {
+            from:kv[0], 
+            message:kv[1]
+        }));
+});
 
 socket.on('messages', function(data) {
     console.log('onmessages');
     for(k in data) {
         messages.set(k, data[k]);
     }
-    messagelog.render(messages, handlers);
 });
 socket.on('message', function(data) {
     console.log('onmessage', data);
@@ -286,9 +275,9 @@ socket.on('codes', function(data) {
     console.log('codereceived', data);
     for(k in data) {
         handlers.set(k, data[k]);
-        handlers.validate(k);
     }
-    messagelog.render(messages, handlers);
+
+    handlers.setup(context);
 });
 socket.on('code', function(data) {
     console.log('oncode', data);

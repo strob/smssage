@@ -6,7 +6,14 @@ var app = require('http').createServer(handler)
   , sms = require('./lib/smssage.js')
   , SOCKETS = []                // all open sockets
   , messages = new sms.UpdatingDictionary()
-  , handlers = new sms.Handlers();
+  , handlers = new sms.Handlers()
+  , context = {handlers: handlers, is_server: true};
+
+['setup', 'dispatch'].forEach(function(name) {
+    handlers.set(name, fs.readFileSync(__dirname + '/default.' + name + '.js', 'utf8'));
+});
+
+handlers.setup(context);
 
 app.listen(5858);
 
@@ -55,7 +62,7 @@ function handler (req, res) {
                 task: "send",
                 messages: [
                     {to: data.from,
-                     message: handlers.getResponse(data.from, data.message)}
+                     message: handlers.getResponse(context, data)}
                 ]
             }}));
         });
@@ -109,7 +116,6 @@ io.sockets.on('connection', function(socket) {
 
     socket.on('code', function(data) {
         handlers.set(data[0], data[1]);
-        handlers.validate(data[0]);
         relayCodeToClients(socket, data[0], data[1]);
     });
 
