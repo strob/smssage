@@ -10,13 +10,10 @@
 
     <style>
 body {
-  background-color: black;
-  color: #00ff00;
-  font-family: mono;
-  margin: 0;
+  margin: 10px;
 }
 .log {
-  height: 200px;
+  height: 120px;
   overflow: auto;
 }
 .editor {
@@ -59,15 +56,37 @@ body {
   margin-left: 20px;
 }
 .testmessage {
-  width: 200px;
-  position: absolute;
-  top: 0;
-  right: 0;
   background-color: orange;
   padding: 10px;
+  margin: 0;
 }
 .ide {
+  background-color: black;
+  color: #00ff00;
+  font-family: mono;
   width: 640px;
+  border: 1px dotted white;
+  float: right;
+}
+.ide.hidden {
+  width: 100px;
+  position: absolute;
+  right: 10px;
+  top: 10px;
+}
+.ide.hidden * {
+  display: none;
+}
+.ide .smssage {
+  background-color: red;
+  color: white;
+  cursor: pointer;
+}
+.ide.hidden .smssage {
+  display: block;
+}
+.from {
+  width: 100px;
 }
     </style>
   </head>
@@ -77,6 +96,7 @@ body {
 var MessageLog = function() {
     SMS.Triggerable.call(this);
     this.$el = document.createElement('div');
+    this.$el.setAttribute('class', 'log');
     this.acc = "";
 };
 MessageLog.prototype = new SMS.Triggerable();
@@ -88,21 +108,23 @@ MessageLog.prototype.add = function(from, msg, rsp) {
 
 var TestMessage = function() {
     SMS.Triggerable.call(this);
-    this.$el = document.createElement('div');
+    this.$el = document.createElement('form');
     this.$el.setAttribute('class', 'testmessage');
 
     var $num = document.createElement('input');
-    var $txt = document.createElement('textarea');
+    $num.setAttribute('class', 'from');
+    var $txt = document.createElement('input');
     var $sub = document.createElement('input');
     $sub.setAttribute('type', 'submit');
-    $sub.setAttribute('value', 'simulate message');
+    $sub.setAttribute('value', 'simulate');
 
     this.$el.appendChild($num);
     this.$el.appendChild($txt);
     this.$el.appendChild($sub);
 
     (function(that) {
-        $sub.onclick = function() {
+        $sub.onclick = function(ev) {
+            ev.preventDefault();
             that.trigger('text', [$num.value, $txt.value]);
         }
     })(this);
@@ -229,11 +251,34 @@ var IDE = function() {
     var $log = document.createElement('div');
     $log.setAttribute('class', 'log')
     $log.appendChild(this.messagelog.$el);
-    $log.appendChild(this.testmsg.$el);
 
+    var $sms = document.createElement('div');
+    $sms.setAttribute('class', 'smssage');
+    $sms.innerHTML = 'smssage';
+    (function(that) {
+        $sms.onclick = function() {
+            if(that.hidden) {
+                that.show();
+            }
+            else {
+                that.hide();
+            }                
+        };
+    })(this);
+
+    this.$el.appendChild($sms);
     this.$el.appendChild($code);
     this.$el.appendChild($log);
+    this.$el.appendChild(this.testmsg.$el);
 };
+IDE.prototype.hide = function() {
+    this.hidden = true;
+    this.$el.setAttribute('class', 'IDE hidden');
+}
+IDE.prototype.show = function() {
+    this.hidden = false;
+    this.$el.setAttribute('class', 'IDE');
+}
 
 var handlers = new SMS.Handlers();
 var ide = new IDE();
@@ -295,11 +340,9 @@ socket.on('rename', function(data) {
     handlers.rename(data[0], data[1]);
 });
 
+document.body.appendChild(ide.$el);
 ide.tabs.trigger("new");
 ide.tabs.select('untitled');
-
-document.body.appendChild(ide.$el);
-
     </script>
   </body>
 </html>
