@@ -12,10 +12,6 @@ var app = require('http').createServer(handler)
     handlers.set(name, fs.readFileSync(__dirname + '/default.' + name + '.js', 'utf8'));
 });
 
-handlers.setup(context);
-
-app.listen(5858);
-
 function relayMessageToClients (from, msg) {
     SOCKETS.forEach(function(s) {
         s.emit('message', {from:from, message:msg});
@@ -34,6 +30,25 @@ function relayRenameToClients (s,k,v) {
             socket.emit('rename', [k,v]);
     });
 };
+function saveCode() {
+    fs.writeFileSync('CODE.json', JSON.stringify(handlers.map), 'utf8');
+};
+function loadCode() {
+    try {
+        var st = fs.statSync('CODE.json');
+        if(st.isFile()) {
+            handlers.map = JSON.parse(fs.readFileSync('CODE.json', 'utf8'));
+        }
+    }
+    catch(e) {
+        console.log(e);
+    }
+};
+
+
+loadCode();
+handlers.setup(context);
+app.listen(5858);
 
 function handler (req, res) {
     var reqUrl = url.parse(req.url, true);
@@ -120,6 +135,8 @@ io.sockets.on('connection', function(socket) {
     socket.on('code', function(data) {
         handlers.set(data[0], data[1]);
         relayCodeToClients(socket, data[0], data[1]);
+
+        saveCode()
     });
 
 });
