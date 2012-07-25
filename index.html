@@ -215,7 +215,6 @@ Editor.prototype.get = function() {
     return this.editor.getValue();
 }
 
-var messages = new SMS.UpdatingDictionary();
 var handlers = new SMS.Handlers();
 
 var tabs = new Tabs();
@@ -249,35 +248,28 @@ tabs.bind("deselected", function(k) {
     }
 });
 
+function onmsg(msg) {
+    messagelog.add(msg.from, msg.message, handlers.getResponse(context, msg));
+};
+
 testmsg.bind("text", function(kv) {
-    messages.set(kv[0], kv[1]);
+    onmsg({from:kv[0], message:kv[1]});
 });
 
-messages.bind("change", function(kv) { 
-    messagelog.add(kv[0], kv[1], handlers.getResponse(
-        context, {
-            from:kv[0], 
-            message:kv[1]
-        }));
-});
-
-socket.on('messages', function(data) {
-    console.log('onmessages');
-    for(k in data) {
-        messages.set(k, data[k]);
+socket.on('init', function(data) {
+    console.log('oninit', data);
+    for(var k in data.codes) {
+        handlers.set(k, data.codes[k]);
     }
-});
-socket.on('message', function(data) {
-    console.log('onmessage', data);
-    messages.set(data[0], data[1]);
-});
-socket.on('codes', function(data) {
-    console.log('codereceived', data);
-    for(k in data) {
-        handlers.set(k, data[k]);
+    for(var k in data.context) {
+        context[k] = data.context[k];
     }
 
     handlers.setup(context);
+});
+socket.on('message', function(data) {
+    console.log('onmessage', data);
+    onmsg(data);
 });
 socket.on('code', function(data) {
     console.log('oncode', data);

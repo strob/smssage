@@ -5,7 +5,6 @@ var app = require('http').createServer(handler)
   , url = require('url')
   , sms = require('./lib/smssage.js')
   , SOCKETS = []                // all open sockets
-  , messages = new sms.UpdatingDictionary()
   , handlers = new sms.Handlers()
   , context = {handlers: handlers, is_server: true};
 
@@ -19,7 +18,7 @@ app.listen(5858);
 
 function relayMessageToClients (from, msg) {
     SOCKETS.forEach(function(s) {
-        s.emit('message', [from, msg]);
+        s.emit('message', {from:from, message:msg});
     });
 };
 function relayCodeToClients (s,k,v) {
@@ -53,7 +52,6 @@ function handler (req, res) {
             var data = qs.parse(req.content);
             console.log("sms received", data);
 
-            messages.set(data.from, data.message);
             relayMessageToClients(data.from, data.message);
 
             res.end(JSON.stringify({payload: {
@@ -66,7 +64,6 @@ function handler (req, res) {
                 ]
             }}));
         });
-
     }
 
     else if(path.indexOf('lib') == 1) {
@@ -97,8 +94,14 @@ function handler (req, res) {
 io.sockets.on('connection', function(socket) {
     SOCKETS.push(socket);
 
-    socket.emit('messages', messages.map);
-    socket.emit('codes', handlers.map);
+    // We send all of the context save for the `handlers' object and
+    // is_server flag.
+    var sendctx = {};
+    for(var k in context) {
+        if(k !== 'handlers' && k !== 'is_server')
+            sendctx[k] = context[k];
+    }
+    socket.emit('init', {context:sendctx, codes: handlers.map});
 
     socket.on('disconnect', function() {
         for(var i=0; i<SOCKETS.length; i++) {
