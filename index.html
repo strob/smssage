@@ -15,11 +15,11 @@ body {
   font-family: mono;
   margin: 0;
 }
-#messages {
+.log {
   height: 200px;
   overflow: auto;
 }
-#code {
+.editor {
   background-color: white;
   clear: both;
 }
@@ -66,15 +66,12 @@ body {
   background-color: orange;
   padding: 10px;
 }
+.ide {
+  width: 640px;
+}
     </style>
   </head>
   <body>
-<div id="messages">
-</div>
-<div id="codeeditor">
-  <div id="code">
-  </div>
-</div>
     <script>
 
 var MessageLog = function() {
@@ -92,7 +89,7 @@ MessageLog.prototype.add = function(from, msg, rsp) {
 var TestMessage = function() {
     SMS.Triggerable.call(this);
     this.$el = document.createElement('div');
-    this.$el.classList.add('testmessage');
+    this.$el.setAttribute('class', 'testmessage');
 
     var $num = document.createElement('input');
     var $txt = document.createElement('textarea');
@@ -115,11 +112,10 @@ TestMessage.prototype = new SMS.Triggerable;
 var Tabs = function() {
     SMS.Triggerable.call(this);
     this.$el = document.createElement('div');
-    this.$el.classList.add("tabs");
+    this.$el.setAttribute("class", "tabs");
 
     this.$new = document.createElement('div');
-    this.$new.classList.add("tab");
-    this.$new.classList.add("new");
+    this.$new.setAttribute("class", "new tab");
     this.$new.innerHTML = "+";
 
     (function(that){
@@ -140,7 +136,7 @@ Tabs.prototype.add = function(k) {
     var key = k;
 
     var $div = document.createElement('div');
-    $div.classList.add('tab');
+    $div.setAttribute('class', 'tab');
 
     var $ed = document.createElement('input');
     var $txt = document.createElement('div');
@@ -186,17 +182,18 @@ Tabs.prototype.select = function(k) {
     if(this.selected == k)
         return
     if(this.selected) {
-        this.tabs[this.selected].classList.remove('selected');
+        this.tabs[this.selected].setAttribute('class', 'tab');
         this.trigger("deselected", this.selected);
     }
     this.selected = k;
-    this.tabs[k].classList.add('selected');
+    this.tabs[k].setAttribute('class', 'selected tab');
     this.trigger("selected", k);
 };
 
 var Editor = function() {
     SMS.Triggerable.call(this);
     this.$el = document.createElement('div');
+    this.$el.setAttribute('class', 'editor');
     (function(that) {
         that.editor = CodeMirror(that.$el, {
             mode: "javascript",
@@ -215,44 +212,62 @@ Editor.prototype.get = function() {
     return this.editor.getValue();
 }
 
+var IDE = function() {
+    this.$el = document.createElement('div');
+    this.$el.setAttribute('class', 'IDE');
+
+    this.tabs = new Tabs();
+    this.messagelog = new MessageLog();
+    this.editor = new Editor();
+    this.testmsg = new TestMessage();
+
+    var $code = document.createElement('div');
+    $code.setAttribute('class', 'codeeditor');
+    $code.appendChild(this.tabs.$el);
+    $code.appendChild(this.editor.$el);
+
+    var $log = document.createElement('div');
+    $log.setAttribute('class', 'log')
+    $log.appendChild(this.messagelog.$el);
+    $log.appendChild(this.testmsg.$el);
+
+    this.$el.appendChild($code);
+    this.$el.appendChild($log);
+};
+
 var handlers = new SMS.Handlers();
-
-var tabs = new Tabs();
-var messagelog = new MessageLog();
-var editor = new Editor();
-var testmsg = new TestMessage();
-var context = {handlers: handlers};
-
+var ide = new IDE();
 var socket = io.connect('http://localhost:5858');
+var context = {handlers: handlers, ide: ide, socket: socket};
 
-handlers.bind("add", function(x) { tabs.add(x[0]); });
-handlers.bind("rename", function(x) { tabs.rename(x[0], x[1]); });
+handlers.bind("add", function(x) { ide.tabs.add(x[0]); });
+handlers.bind("rename", function(x) { ide.tabs.rename(x[0], x[1]); });
 
-tabs.bind("rename", function(x) { 
+ide.tabs.bind("rename", function(x) { 
     if(x[0] != 'untitled')
         socket.emit("rename", x);
     handlers.rename(x[0], x[1]); 
 });
 
-tabs.bind("new", function() { handlers.set("untitled", "function(ctx, msg){\n  return 'unimplemented';\n}") });
-tabs.bind("selected", function(k) { editor.set(handlers.map[k]); });
-tabs.bind("deselected", function(k) {
+ide.tabs.bind("new", function() { handlers.set("untitled", "function(ctx, msg){\n  return 'unimplemented';\n}") });
+ide.tabs.bind("selected", function(k) { ide.editor.set(handlers.map[k]); });
+ide.tabs.bind("deselected", function(k) {
     var oldcode = handlers.map[k];
-    var newcode = editor.get();
-    handlers.set(tabs.selected, newcode);
+    var newcode = ide.editor.get();
+    handlers.set(ide.tabs.selected, newcode);
     if(k !== "untitled") {
         if(oldcode !== newcode) {
-            console.log('saving code', k, editor.get());
-            socket.emit("code", [k, editor.get()]);
+            console.log('saving code', k, ide.editor.get());
+            socket.emit("code", [k, ide.editor.get()]);
         }
     }
 });
 
 function onmsg(msg) {
-    messagelog.add(msg.from, msg.message, handlers.getResponse(context, msg));
+    ide.messagelog.add(msg.from, msg.message, handlers.getResponse(context, msg));
 };
 
-testmsg.bind("text", function(kv) {
+ide.testmsg.bind("text", function(kv) {
     onmsg({from:kv[0], message:kv[1]});
 });
 
@@ -280,21 +295,10 @@ socket.on('rename', function(data) {
     handlers.rename(data[0], data[1]);
 });
 
-var $ce = document.getElementById('codeeditor');
-$ce.insertBefore(tabs.$el, document.getElementById('code'));
+ide.tabs.trigger("new");
+ide.tabs.select('untitled');
 
-var $ml = document.getElementById('messages');
-$ml.appendChild(messagelog.$el);
-
-$ml.appendChild(testmsg.$el);
-
-var $ed = document.getElementById('code');
-$ed.appendChild(editor.$el);
-
-tabs.trigger("new");
-tabs.select('untitled');
-
-//document.body.appendChild(newCode());
+document.body.appendChild(ide.$el);
 
     </script>
   </body>
