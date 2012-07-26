@@ -12,6 +12,27 @@ var app = require('http').createServer(handler)
     handlers.set(name, fs.readFileSync(__dirname + '/default.' + name + '.js', 'utf8'));
 });
 
+function serializeContext() {
+    // We send all of the context save for the `handlers' object and
+    // is_server flag.
+    var sendctx = {};
+    for(var k in context) {
+        if(k !== 'handlers' && k !== 'is_server') {
+            console.log("saving", k);
+            sendctx[k] = context[k];
+        }
+    }
+    return sendctx;
+}
+
+function deserializeContext(ctxstr) {
+    var newctx = JSON.parse(ctxstr);
+    for(var k in newctx) {
+        context[k] = newctx[k];
+    }
+    console.log("deserialized", context);
+}
+
 function relayMessageToClients (from, msg) {
     SOCKETS.forEach(function(s) {
         s.emit('message', {from:from, message:msg});
@@ -30,10 +51,11 @@ function relayRenameToClients (s,k,v) {
             socket.emit('rename', [k,v]);
     });
 };
-function saveCode() {
+function save() {
     fs.writeFileSync('CODE.json', JSON.stringify(handlers.map), 'utf8');
+    fs.writeFileSync('CONTEXT.json', JSON.stringify(serializeContext()), 'utf8');
 };
-function loadCode() {
+function load() {
     try {
         var st = fs.statSync('CODE.json');
         if(st.isFile()) {
@@ -43,10 +65,19 @@ function loadCode() {
     catch(e) {
         console.log(e);
     }
+    try {
+        var ctx = fs.statSync('CONTEXT.json');
+        if(st.isFile()) {
+            deserializeContext(fs.readFileSync('CONTEXT.json', 'utf8'));
+        }
+    }
+    catch(e) {
+        console.log(e);
+    }
 };
 
 
-loadCode();
+load();
 handlers.setup(context);
 app.listen(5858);
 
@@ -78,6 +109,7 @@ function handler (req, res) {
                      message: handlers.getResponse(context, data)}
                 ]
             }}));
+            save();
         });
     }
 
@@ -108,15 +140,7 @@ function handler (req, res) {
 
 io.sockets.on('connection', function(socket) {
     SOCKETS.push(socket);
-
-    // We send all of the context save for the `handlers' object and
-    // is_server flag.
-    var sendctx = {};
-    for(var k in context) {
-        if(k !== 'handlers' && k !== 'is_server')
-            sendctx[k] = context[k];
-    }
-    socket.emit('init', {context:sendctx, codes: handlers.map});
+    socket.emit('init', {context:serializeContext(), codes: handlers.map});
 
     socket.on('disconnect', function() {
         for(var i=0; i<SOCKETS.length; i++) {
@@ -136,7 +160,7 @@ io.sockets.on('connection', function(socket) {
         handlers.set(data[0], data[1]);
         relayCodeToClients(socket, data[0], data[1]);
 
-        saveCode()
+        save()
     });
 
 });
